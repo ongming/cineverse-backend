@@ -11,10 +11,12 @@ const { sendOTPEmail } = require("../../services/emailService.js");
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = "30s"; // Token expiration time (15 minutes)
 const SALT_ROUNDS = 10; // Number of salt rounds for bcrypt
-const googleClient = new OAuth2Client(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET
-);
+const getGoogleClient = () => {
+  return new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
+  );
+};
 
 const generateAccessToken = (user) => {
   const payload = {
@@ -101,15 +103,15 @@ const loginWithGoogle = async (credential) => {
   let email, name, picture;
 
   try {
-    // Single fast request to Google using postmessage for @react-oauth/google popup flow
-    const { tokens } = await googleClient.getToken({
+    const client = getGoogleClient();
+    const { tokens } = await client.getToken({
       code: credential,
       redirect_uri: "postmessage",
     });
 
     if (tokens?.id_token) {
       // 3. Verify JWT ID token locally (Instant!)
-      const ticket = await googleClient.verifyIdToken({
+      const ticket = await client.verifyIdToken({
         idToken: tokens.id_token,
         audience: process.env.GOOGLE_CLIENT_ID,
       });
