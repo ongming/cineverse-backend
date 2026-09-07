@@ -100,16 +100,11 @@ const resetPassword = async (email, otp, newPassword) => {
 const loginWithGoogle = async (credential) => {
   let email, name, picture;
 
-  // 1. Determine redirect_uri dynamically based on environment
-  const redirectUri = process.env.NODE_ENV === "production"
-    ? (process.env.FRONTEND_URL || "https://cineverse-frontend-seven.vercel.app")
-    : "postmessage";
-
   try {
-    // 2. Single fast request to Google to exchange code for tokens
+    // Single fast request to Google using postmessage for @react-oauth/google popup flow
     const { tokens } = await googleClient.getToken({
       code: credential,
-      redirect_uri: redirectUri,
+      redirect_uri: "postmessage",
     });
 
     if (tokens?.id_token) {
