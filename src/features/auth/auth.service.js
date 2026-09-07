@@ -11,12 +11,10 @@ const { sendOTPEmail } = require("../../services/emailService.js");
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = "30s"; // Token expiration time (15 minutes)
 const SALT_ROUNDS = 10; // Number of salt rounds for bcrypt
-const getGoogleClient = () => {
-  return new OAuth2Client(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET
-  );
-};
+const googleClient = new OAuth2Client(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET
+);
 
 const generateAccessToken = (user) => {
   const payload = {
@@ -103,34 +101,19 @@ const loginWithGoogle = async (credential) => {
   let email, name, picture;
 
   try {
-    const client = getGoogleClient();
-    const { tokens } = await client.getToken({
-      code: credential,
-      redirect_uri: "postmessage",
+    // 1. Direct ID Token verification (Google <GoogleLogin /> always sends "eyJ...")
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
     });
-
-    if (tokens?.id_token) {
-      // 3. Verify JWT ID token locally (Instant!)
-      const ticket = await client.verifyIdToken({
-        idToken: tokens.id_token,
-        audience: process.env.GOOGLE_CLIENT_ID,
-      });
-      const payload = ticket.getPayload();
-      email = payload.email;
-      name = payload.name;
-      picture = payload.picture;
-    } else if (tokens?.access_token) {
-      const response = await axios.get(
-        "https://www.googleapis.com/oauth2/v3/userinfo",
-        { headers: { Authorization: `Bearer ${tokens.access_token}` } }
-      );
-      email = response.data.email;
-      name = response.data.name;
-      picture = response.data.picture;
-    }
+    
+    const payload = ticket.getPayload();
+    email = payload.email;
+    name = payload.name;
+    picture = payload.picture;
   } catch (err) {
-    console.error("Lỗi Google Auth Backend:", err.response?.data || err.message || err);
-    throw new UnauthorizedError("Xác thực token Google thất bại");
+    console.error("Lỗi Google Auth Backend:", err.message);
+    throw new UnauthorizedError("Xác thực Google ID Token thất bại");
   }
 
   if (!email) {
@@ -139,7 +122,7 @@ const loginWithGoogle = async (credential) => {
 
   const cleanEmail = email.trim().toLowerCase();
 
-  // 4. PostgreSQL User Lookup / Creation
+  // 2. Find or Create User in PostgreSQL
   let user = await userModel.findUserByEmail(cleanEmail);
   if (!user) {
     const randomPassword = await bcrypt.hash(Math.random().toString(36), 10);
@@ -151,18 +134,11 @@ const loginWithGoogle = async (credential) => {
     });
   }
 
-  // 5. Generate Session & JWT
-  const refreshToken = crypto.randomBytes(64).toString("hex");
-  await userModel.session(
-    user.id,
-    refreshToken,
-    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-  );
-  await userModel.cleanupOldSessions(user.id, 5);
-
+  // 3. Return App JWT Token & User Profile
   const token = generateAccessToken(user);
   const { password_hash, ...safeUser } = user;
-  return { user: safeUser, token, refreshToken };
+
+  return { user: safeUser, token };
 };
 
 const refreshAccessToken = async (refreshToken) => {
