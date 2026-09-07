@@ -113,7 +113,7 @@ const loginWithGoogle = async (credential) => {
     picture = payload.picture;
   } catch (err) {
     console.error("Lỗi Google Auth Backend:", err.message);
-    throw new UnauthorizedError("Xác thực Google ID Token thất bại");
+    throw new UnauthorizedError("Lỗi Google: " + (err.message || err));
   }
 
   if (!email) {
