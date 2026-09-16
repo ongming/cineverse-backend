@@ -20,14 +20,14 @@ const register = async (req, res, next) => {
         message: "Thiếu thông tin đăng ký",
       });
     }
-    const { user, token } = await authService.registerUser({
+    await authService.registerUser({
       username,
       email,
       password,
     });
     res.status(201).json({
       success: true,
-      data: { user, token },
+      data: { message: "Đăng ký thành công" },
     });
   } catch (error) {
     next(error);
@@ -99,7 +99,8 @@ const resetPassword = async (req, res, next) => {
 const loginWithGoogle = async (req, res, next) => {
   try {
     const { credential } = req.body;
-    const { user, token, refreshToken } = await authService.loginWithGoogle(credential);
+    const { user, token, refreshToken } =
+      await authService.loginWithGoogle(credential);
 
     setRefreshTokenCookie(res, refreshToken);
     res.status(200).json({
@@ -107,7 +108,10 @@ const loginWithGoogle = async (req, res, next) => {
       data: { user, token },
     });
   } catch (error) {
-    console.error("Lỗi Google Auth Backend:", error.response?.data || error.message || error);
+    console.error(
+      "Lỗi Google Auth Backend:",
+      error.response?.data || error.message || error,
+    );
     next(error);
   }
 };
@@ -119,9 +123,9 @@ const refreshToken = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: "Không có refresh token",
-      }); 
-    }   
-    const {token } = await authService.refreshAccessToken(refreshToken);
+      });
+    }
+    const { token } = await authService.refreshAccessToken(refreshToken);
     res.status(200).json({
       success: true,
       data: { token },
@@ -134,7 +138,7 @@ const refreshToken = async (req, res, next) => {
 const logout = async (req, res, next) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
-    
+
     if (refreshToken) {
       await authService.logout(refreshToken);
     }
@@ -164,5 +168,5 @@ module.exports = {
   resetPassword,
   loginWithGoogle,
   refreshToken,
-  logout
+  logout,
 };
